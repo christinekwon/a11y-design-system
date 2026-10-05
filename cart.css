@@ -1,0 +1,188 @@
+/* cart.css — accessibility-critical styles only.
+ *
+ * Every rule here exists to satisfy a WCAG 2.2 AA success criterion, named in the
+ * comment beside it. There are deliberately no visual opinions: no colour, type,
+ * spacing or layout beyond what a criterion requires. Those belong in the
+ * theme's stylesheet. Theme this layer through the tokens below.
+ */
+
+/* Tokens sit at :where(:root) — zero specificity, so overriding them on .cart or
+ * .cart-dialog always wins. They must not be scoped to .cart: the dialog is its
+ * parent and would not inherit them. */
+:where(:root) {
+  --cart-focus: currentColor;
+  --cart-focus-width: 2px;
+  --cart-focus-offset: 2px;
+  --cart-target: 44px; /* 2.5.8 requires 24px; 44px is the comfortable default. */
+  --cart-error: #b3261e;
+  --cart-surface: Canvas;
+  --cart-width: 26rem;
+}
+
+button:disabled {
+  opacity: 0.2;
+}
+
+/* 1.3.1, 4.1.2 — exposed to assistive tech, not to sighted users. Never
+ * `display: none`, which would remove it from the accessibility tree too. The
+ * status region is clipped for the same reason: it is announced, not seen. */
+.cart__vh,
+.cart__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 2.4.7 — a visible focus indicator on every interactive element. Style the
+ * outline; never remove it. The title is listed separately because it receives
+ * focus programmatically (on drawer open, and as the last focus fallback), and
+ * browsers do not match :focus-visible for programmatic focus. */
+.cart :focus-visible,
+.cart__title:focus {
+  outline: var(--cart-focus-width) solid var(--cart-focus);
+  outline-offset: var(--cart-focus-offset);
+}
+
+/* 2.5.8 Target Size (Minimum). min-height does not apply to inline elements, so
+ * the remove link needs a flex display for the floor to take effect at all. */
+.cart__qty-step,
+.cart__remove,
+.cart__close,
+.cart__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--cart-target);
+  min-height: var(--cart-target);
+}
+
+.cart__qty-input {
+  min-height: var(--cart-target);
+}
+
+/* 1.4.1 — the error is marked by weight and a border, not colour alone. It stays
+ * `hidden` until JS fills it, so the quantity input's aria-describedby resolves
+ * to nothing while there is no error. */
+.cart__item-error {
+  border-inline-start: 3px solid var(--cart-error);
+  padding-inline-start: 0.5rem;
+  color: var(--cart-error);
+  font-weight: 700;
+}
+
+/* 4.1.2 — aria-busy during a request, instead of disabling the control the user
+ * is operating. Disabling it would drop focus to <body>. */
+.cart__contents[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+/* Progressive enhancement. The steppers are the only JS-only controls: quantity
+ * inputs, "Update cart", removal and checkout all work unenhanced. */
+cart-root:not(:defined) .cart__qty-step {
+  display: none;
+}
+
+cart-root:defined .cart__update {
+  display: none;
+}
+
+/* ---------- Drawer ---------- */
+
+/* showModal() supplies the focus trap, Escape to close, and an inert page. The
+ * zeroed margin, padding and border keep the panel flush with the dialog box, so
+ * any click outside it lands on ::backdrop, which reports the dialog as its
+ * target — that is what makes click-outside-to-close work. */
+.cart-dialog {
+  position: fixed;
+  inset-block: 0;
+  inset-inline: auto 0;
+  width: var(--cart-width);
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cart-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+
+/* 2.4.11 Focus Not Obscured (Minimum) — the summary is sticky, so the scroll
+ * container reserves room for it when the browser scrolls a focused quantity
+ * input into view. The flex column exists only to create that scroll container. */
+.cart-dialog .cart,
+.cart-dialog .cart__contents {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.cart-dialog .cart__form {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scroll-padding-block-end: 8rem;
+}
+
+.cart-dialog .cart__summary {
+  position: sticky;
+  inset-block-end: 0;
+  background: var(--cart-surface);
+}
+
+/* The page behind an open modal must not scroll. */
+html.cart-open,
+html.cart-open body {
+  overflow: hidden;
+}
+
+/* 2.3.3 — motion is opt-in, never the default. */
+@media (prefers-reduced-motion: no-preference) {
+  .cart-dialog[open] {
+    animation: cart-slide-in 200ms ease-out;
+  }
+
+  @keyframes cart-slide-in {
+    from {
+      transform: translateX(100%);
+    }
+  }
+}
+
+/* 1.4.10 Reflow — full width at 320px, so nothing scrolls horizontally. */
+@media (max-width: 30rem) {
+  .cart-dialog {
+    width: 100%;
+  }
+}
+
+/* 1.4.1, 1.4.11 — survive forced colours, where backgrounds and shadows are
+ * dropped but borders and system colours still render. */
+@media (forced-colors: active) {
+  .cart-dialog {
+    border: 1px solid CanvasText;
+  }
+
+  .cart__item-error {
+    border-inline-start-color: LinkText;
+    color: LinkText;
+  }
+
+  .cart__contents[aria-busy="true"] {
+    opacity: 1;
+  }
+
+  .cart :focus-visible,
+  .cart__title:focus {
+    outline-color: Highlight;
+  }
+}

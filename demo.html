@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Accessible cart demo</title>
+    <link rel="stylesheet" href="cart.css" />
+    <link rel="stylesheet" href="cart-theme.css" />
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+        color: black;
+      }
+      main {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+      }
+      .site-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgb(0 0 0 / 0.12);
+        background: #fff;
+      }
+      .site-header strong {
+        font-size: 1.125rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      ol {
+        padding-inline-start: 1.25rem;
+      }
+      li + li {
+        margin-block-start: 0.5rem;
+      }
+      kbd {
+        padding: 0.1em 0.4em;
+        border: 1px solid rgb(0 0 0 / 0.3);
+        border-radius: 3px;
+        font-size: 0.875em;
+      }
+      .note {
+        padding: 1rem;
+        border-inline-start: 3px solid #8a6a3a;
+        background: #fff;
+      }
+      .warning {
+        padding: 1rem;
+        margin-block-end: 1.5rem;
+        border-inline-start: 3px solid #b3261e;
+        background: #fff;
+      }
+      .warning code {
+        display: inline-block;
+        padding: 0.1em 0.4em;
+        background: #f2efea;
+      }
+      /* This demo's brand layer: tokens and the one filled button.
+         Structure comes from cart-theme.css, accessibility from cart.css. */
+      .cart-dialog,
+      .cart {
+        --cart-focus: #0b57d0;
+        --cart-focus-width: 3px;
+        --cart-surface: #fff;
+        --cart-width: 28rem;
+        --cart-rule: rgb(0 0 0 / 0.15);
+      }
+      .cart {
+        background: #fff;
+      }
+      .cart__checkout {
+        border-color: #16110d;
+        background: #16110d;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <strong>Demo Store</strong>
+      <!-- A real link to /cart, so it works before (and without) the module. -->
+      <a href="/cart" data-cart-open>
+        Cart, <span data-cart-count>4 items</span>
+      </a>
+    </header>
+
+    <main>
+      <h1>Accessible cart drawer</h1>
+
+      <!-- Shown only when the module failed to load; see the check at the end of the page. -->
+      <div class="warning" data-module-warning hidden>
+        <p>
+          <strong>Serve this page over HTTP.</strong> Opened straight from disk
+          over <code>file://</code>, Chrome blocks ES modules as a cross-origin
+          request, so <code>cart.js</code> never runs and the cart link
+          navigates for real.
+        </p>
+        <p>
+          From this folder: <code>python3 -m http.server 8000</code>, then visit
+          <code>http://localhost:8000/demo.html</code>.
+        </p>
+      </div>
+
+      <p class="note">
+        A static harness for reviewing the template in a browser. The cart lives
+        in memory and <code>fetch</code> is stubbed, so this page stands in for
+        the Section Rendering API: it returns the same re-rendered markup the
+        Liquid snippet produces server-side. The stylesheet and the JavaScript
+        are the real files, unmodified.
+      </p>
+
+      <h2>What to try</h2>
+      <ol>
+        <li>
+          Open the cart with <kbd>Enter</kbd>. Focus lands on the cart title, so
+          a screen reader announces "Your cart, 4 items" rather than "Close,
+          button".
+        </li>
+        <li>
+          <kbd>Tab</kbd> around. Focus stays inside the dialog and the page
+          behind it is inert — both from <code>showModal()</code>, with no
+          JavaScript of our own.
+        </li>
+        <li>
+          Change a quantity. Focus stays on the control you were using, even
+          though the whole cart was replaced, and the new subtotal is announced.
+        </li>
+        <li>
+          Remove the last item in the list. Focus moves to the previous item's
+          link; remove every item and it moves to the cart title.
+        </li>
+        <li>
+          Set <strong>Product C</strong> to 5. It is limited to 2, so the stubbed
+          response is a 422: the message appears under the input, is tied to it
+          with <code>aria-describedby</code>, the value reverts, and the error
+          is announced.
+        </li>
+        <li>
+          Press <kbd>Esc</kbd>, or click the backdrop. Focus returns to the
+          header link.
+        </li>
+      </ol>
+    </main>
+
+    <cart-drawer>
+      <dialog class="cart-dialog" aria-labelledby="cart-title-demo">
+        <cart-root class="cart" data-section-id="demo">
+          <!-- Replaced wholesale on every update; see renderContents() below. -->
+          <div class="cart__contents" data-cart-contents></div>
+
+          <p class="cart__status" role="status" data-cart-status></p>
+
+          <script type="application/json" data-cart-strings>
+            {
+              "updated": "{title}, quantity {quantity}. Subtotal {subtotal}.",
+              "removed": "Removed {title}. Subtotal {subtotal}.",
+              "loading": "Updating cart",
+              "error": "Your cart could not be updated.",
+              "count_one": "1 item",
+              "count_other": "{count} items"
+            }
+          </script>
+        </cart-root>
+      </dialog>
+    </cart-drawer>
+
+    <!-- Classic script: runs before the deferred module, so the stub is in place. -->
+    <script>
+      const cart = {
+        items: [
+          {
+            key: "1001:a",
+            title: "Product A",
+            price: 500,
+            quantity: 1,
+            min: 1,
+            max: null,
+            options: [["Option A", "Option A"]],
+          },
+          {
+            key: "1002:b",
+            title: "Product B",
+            price: 1000,
+            quantity: 2,
+            min: 1,
+            max: 10,
+            options: [["Option A", "Option B"]],
+          },
+          {
+            key: "1003:c",
+            title: "Product C",
+            price: 2500,
+            quantity: 1,
+            min: 1,
+            max: 2,
+            options: [],
+          },
+        ],
+      };
+
+      const money = (cents) => `$${(cents / 100).toFixed(2)}`;
+      const count = () =>
+        cart.items.reduce((total, item) => total + item.quantity, 0);
+      const esc = (value) =>
+        String(value).replace(
+          /[&<>"]/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+
+      /** A JS mirror of cart.liquid, for the demo only. In a theme, Liquid renders this. */
+      function renderContents() {
+        const total = cart.items.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+        const label = count() === 1 ? "1 item" : `${count()} items`;
+
+        const header = `
+          <header class="cart__header">
+            <h2 class="cart__title" id="cart-title-demo" tabindex="-1" data-cart-title>
+              Your cart <span class="cart__title-count">${label}</span>
+            </h2>
+            <button type="button" class="cart__close" data-cart-close>Close</button>
+          </header>`;
+
+        const wrap = (body) =>
+          `<div class="cart__contents" data-cart-contents>${header}${body}</div>`;
+
+        if (cart.items.length === 0) {
+          return wrap(`
+            <div class="cart__empty">
+              <p class="cart__empty-heading">Your cart is empty</p>
+              <p>Continue shopping to add items to your cart.</p>
+              <button type="button" class="cart__button" data-cart-close>
+                Continue shopping
+              </button>
+            </div>`);
+        }
+
+        const items = cart.items
+          .map((item, index) => {
+            const name = esc(item.title);
+            const qtyId = `cart-qty-demo-${index + 1}`;
+            const errorId = `cart-error-demo-${index + 1}`;
+            const meta = item.options.length
+              ? `<dl class="cart__item-meta">${item.options
+                  .map(
+                    ([key, value]) =>
+                      `<dt>${esc(key)}</dt><dd>${esc(value)}</dd>`,
+                  )
+                  .join("")}</dl>`
+              : "";
+
+            return `
+              <li class="cart__item" data-cart-item data-key="${item.key}">
+                <div class="cart__item-body">
+                  <h3 class="cart__item-title">
+                    <a href="#product" data-cart-item-link>${name}</a>
+                  </h3>
+                  ${meta}
+                  <p class="cart__item-price">
+                    <span class="cart__vh">Price</span>
+                    <span>${money(item.price * item.quantity)}</span>
+                  </p>
+                  <div class="cart__qty">
+                    <label class="cart__vh" for="${qtyId}">Quantity, ${name}</label>
+                    <button type="button" class="cart__qty-step" data-cart-step="-1"
+                      data-focus-id="${item.key}:minus"${item.quantity <= item.min ? " disabled" : ""}>
+                      <span aria-hidden="true">&minus;</span>
+                      <span class="cart__vh">Decrease quantity for ${name}</span>
+                    </button>
+                    <input class="cart__qty-input" id="${qtyId}" name="updates[${item.key}]"
+                      type="number" inputmode="numeric" value="${item.quantity}" min="${item.min}"
+                      step="1"${item.max ? ` max="${item.max}"` : ""}
+                      aria-describedby="${errorId}" data-focus-id="${item.key}:qty">
+                    <button type="button" class="cart__qty-step" data-cart-step="1"
+                      data-focus-id="${item.key}:plus"${item.max && item.quantity >= item.max ? " disabled" : ""}>
+                      <span aria-hidden="true">+</span>
+                      <span class="cart__vh">Increase quantity for ${name}</span>
+                    </button>
+                    <a class="cart__remove" href="#remove" data-cart-remove
+                      data-focus-id="${item.key}:remove">
+                      <span aria-hidden="true">Remove</span>
+                      <span class="cart__vh">Remove ${name}</span>
+                    </a>
+                  </div>
+                  <p class="cart__item-error" id="${errorId}" data-cart-error hidden></p>
+                </div>
+              </li>`;
+          })
+          .join("");
+
+        return wrap(`
+          <form action="/cart" method="post" id="cart-form-demo" class="cart__form">
+            <ul role="list" class="cart__items">${items}</ul>
+            <button type="submit" name="update" class="cart__button cart__update">
+              Update cart
+            </button>
+          </form>
+          <div class="cart__summary">
+            <dl class="cart__totals">
+              <dt>Subtotal</dt>
+              <dd data-cart-subtotal>${money(total)}</dd>
+            </dl>
+            <p class="cart__footnote">Shipping and taxes calculated at checkout.</p>
+            <button type="submit" name="checkout" form="cart-form-demo"
+              class="cart__button cart__checkout">Checkout</button>
+          </div>`);
+      }
+
+      document.querySelector("[data-cart-contents]").outerHTML =
+        renderContents();
+
+      /** Stands in for /cart/change.js and the Section Rendering API. */
+      const reply = (status, body) => ({
+        ok: status < 400,
+        status,
+        json: async () => body,
+        text: async () => renderContents(),
+      });
+
+      const realFetch = window.fetch;
+      window.fetch = async (url, options = {}) => {
+        const href = String(url);
+        await new Promise((resolve) => setTimeout(resolve, 250)); // visible aria-busy
+
+        if (href.includes("section_id=")) return reply(200, null);
+        if (!href.includes("/cart/change.js"))
+          return realFetch.call(window, url, options);
+
+        const { id, quantity } = JSON.parse(options.body);
+        const item = cart.items.find((candidate) => candidate.key === id);
+        if (!item)
+          return reply(404, {
+            description: "That item is no longer in your cart.",
+          });
+
+        if (item.max && quantity > item.max) {
+          return reply(422, {
+            description: `You can only add ${item.max} of ${item.title} to the cart.`,
+          });
+        }
+
+        if (quantity <= 0)
+          cart.items = cart.items.filter((candidate) => candidate !== item);
+        else item.quantity = quantity;
+
+        return reply(200, {
+          item_count: count(),
+          sections: { demo: renderContents() },
+        });
+      };
+    </script>
+
+    <script type="module" src="cart.js"></script>
+
+    <script>
+      // Deferred modules run before `load`, so by now either the elements are
+      // defined or the module failed. Explain the failure rather than letting the
+      // browser show "Your file couldn't be accessed" when the link navigates.
+      window.addEventListener("load", () => {
+        if (customElements.get("cart-drawer")) return;
+
+        document.querySelector("[data-module-warning]").hidden = false;
+        document
+          .querySelector("[data-cart-open]")
+          .addEventListener("click", (event) => {
+            event.preventDefault();
+            document.querySelector("[data-module-warning]").scrollIntoView();
+          });
+      });
+    </script>
+  </body>
+</html>

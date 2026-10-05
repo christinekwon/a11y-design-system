@@ -1,0 +1,177 @@
+/* cart-theme.css — starter layout for the cart template. Optional.
+ *
+ * cart.css carries only rules that satisfy a WCAG criterion, so on its own the
+ * markup is correct but unstyled. This file is the structural layer: spacing,
+ * alignment and hairlines, and nothing else. It is deliberately brand-neutral —
+ * no colours, no type scale, no fonts. Borders derive from the inherited text
+ * colour, so it adapts to whatever palette the theme sets.
+ *
+ * Override any of it from your theme, or delete the file and write your own.
+ */
+
+:where(:root) {
+  --cart-gap: 1rem;
+  --cart-radius: 4px;
+  --cart-rule: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+/* ---------- Header ---------- */
+
+.cart__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: var(--cart-gap);
+}
+
+.cart__title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.cart__title-count {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* ---------- Line items ---------- */
+
+.cart__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cart__item {
+  display: flex;
+  gap: var(--cart-gap);
+  padding: var(--cart-gap);
+  border-block-start: 1px solid var(--cart-rule);
+}
+
+.cart__item-image {
+  flex: 0 0 auto;
+  border-radius: var(--cart-radius);
+  object-fit: cover;
+}
+
+.cart__item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cart__item-title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.cart__item-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 0.5rem;
+  margin: 0 0 0.25rem;
+}
+
+.cart__item-meta dt::after {
+  content: ":";
+}
+
+.cart__item-meta dd,
+.cart__totals dd {
+  margin: 0;
+}
+
+.cart__item-price {
+  margin: 0 0 0.5rem;
+}
+
+.cart__item-discounts {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---------- Quantity ---------- */
+
+.cart__qty {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cart__qty-input {
+  width: 4rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--cart-rule);
+  border-radius: var(--cart-radius);
+  font: inherit;
+  color: inherit;
+}
+
+/* Structure only — the stepper and remove control inherit their colours. */
+.cart__qty-step,
+.cart__close {
+  border: 1px solid var(--cart-rule);
+  border-radius: var(--cart-radius);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cart__remove {
+  margin-inline-start: auto;
+  color: inherit;
+}
+
+/* ---------- Summary ---------- */
+
+.cart__summary {
+  padding: var(--cart-gap);
+  border-block-start: 1px solid var(--cart-rule);
+}
+
+.cart__totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 1rem;
+  margin: 0 0 var(--cart-gap);
+}
+
+.cart__footnote {
+  margin: 0 0 var(--cart-gap);
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.cart__button {
+  padding: 0.65rem 1.25rem;
+  border: 1px solid currentColor;
+  border-radius: var(--cart-radius);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cart__checkout {
+  width: 100%;
+}
+
+/* ---------- Empty state ---------- */
+
+.cart__empty {
+  padding: var(--cart-gap);
+}
+
+.cart__empty-heading {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+.cart__empty-collections {
+  margin: 0 0 var(--cart-gap);
+  padding: 0;
+  list-style: none;
+}

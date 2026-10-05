@@ -1,0 +1,302 @@
+{% doc %}
+  Accessible cart. Renders either inside a modal <dialog> (drawer) or as a page.
+  Targets WCAG 2.2 AA. Requires assets/cart.js and assets/cart.css,
+  and the `cart.*` keys in locales/en.default.json (see the agent guide).
+
+  @param {boolean} [is_drawer] - Wrap in a modal <dialog>. Default false (renders as a page).
+  @param {number} [heading_level] - Level for the cart title. Default 2 in a drawer, 1 on a page.
+  @param {string} [section_id] - Section id for bundled section rendering. Default section.id.
+  @param {string} [footnote] - Small print under the subtotal.
+  @param {string} [empty_heading] - Heading shown when the cart is empty.
+  @param {string} [empty_message] - Message shown when the cart is empty.
+  @param {object} [empty_collections] - A collection_list setting shown when the cart is empty.
+  @param {string} [empty_cta_label] - Label for the empty-state call to action.
+  @param {string} [empty_cta_url] - URL for the empty-state call to action. Ignored in a drawer.
+{% enddoc %}
+
+{% liquid
+  assign drawer = is_drawer | default: false, allow_false: true
+
+  if heading_level == blank
+    if drawer
+      assign heading_level = 2
+    else
+      assign heading_level = 1
+    endif
+  endif
+  assign item_level = heading_level | plus: 1
+
+  assign sid = section_id | default: section.id
+  assign title_id = 'cart-title-' | append: sid
+  assign form_id = 'cart-form-' | append: sid
+%}
+
+{%- if drawer -%}
+  <cart-drawer>
+    <dialog class="cart-dialog" aria-labelledby="{{ title_id }}">
+{%- endif -%}
+
+<cart-root class="cart" data-section-id="{{ sid }}">
+  {%- comment -%} Everything inside this node is replaced on every update. {%- endcomment -%}
+  <div class="cart__contents" data-cart-contents>
+    <header class="cart__header">
+      <h{{ heading_level }} class="cart__title" id="{{ title_id }}" tabindex="-1" data-cart-title>
+        {{- 'cart.title' | t -}}
+        <span class="cart__title-count">
+          {{- 'cart.item_count' | t: count: cart.item_count -}}
+        </span>
+      </h{{ heading_level }}>
+
+      {%- if drawer -%}
+        <button type="button" class="cart__close" data-cart-close>
+          {{- 'cart.close' | t -}}
+        </button>
+      {%- endif -%}
+    </header>
+
+    {%- if cart.item_count == 0 -%}
+      <div class="cart__empty">
+        {%- if empty_heading != blank -%}
+          <p class="cart__empty-heading">{{ empty_heading }}</p>
+        {%- endif -%}
+
+        {%- if empty_message != blank -%}
+          <p>{{ empty_message }}</p>
+        {%- endif -%}
+
+        {%- if empty_collections != blank -%}
+          <ul role="list" class="cart__empty-collections">
+            {%- for collection in empty_collections -%}
+              <li><a href="{{ collection.url }}">{{ collection.title }}</a></li>
+            {%- endfor -%}
+          </ul>
+        {%- endif -%}
+
+        {%- if drawer -%}
+          {%- liquid
+            assign close_label = empty_cta_label
+            if close_label == blank
+              assign close_label = 'cart.continue_shopping' | t
+            endif
+          -%}
+          <button type="button" class="cart__button" data-cart-close>
+            {{- close_label -}}
+          </button>
+        {%- elsif empty_cta_label != blank and empty_cta_url != blank -%}
+          <a class="cart__button" href="{{ empty_cta_url }}">{{ empty_cta_label }}</a>
+        {%- endif -%}
+      </div>
+
+    {%- else -%}
+      <form action="{{ routes.cart_url }}" method="post" id="{{ form_id }}" class="cart__form">
+        <ul role="list" class="cart__items">
+          {%- for item in cart.items -%}
+            {%- liquid
+              assign qmin = item.variant.quantity_rule.min | default: 1
+              assign qstep = item.variant.quantity_rule.increment | default: 1
+              assign qmax = item.variant.quantity_rule.max
+              assign qty_id = 'cart-qty-' | append: sid | append: '-' | append: forloop.index
+              assign error_id = 'cart-error-' | append: sid | append: '-' | append: forloop.index
+            -%}
+
+            <li class="cart__item" data-cart-item data-key="{{ item.key }}">
+              {%- if item.image -%}
+                {%- comment -%} alt="" on purpose: the product title is the adjacent text. {%- endcomment -%}
+                <img
+                  class="cart__item-image"
+                  src="{{ item.image | image_url: width: 160 }}"
+                  alt=""
+                  width="80"
+                  height="80"
+                  loading="lazy"
+                >
+              {%- endif -%}
+
+              <div class="cart__item-body">
+                <h{{ item_level }} class="cart__item-title">
+                  <a href="{{ item.url }}" data-cart-item-link>{{ item.product.title }}</a>
+                </h{{ item_level }}>
+
+                {%- capture item_meta -%}
+                  {%- for option in item.options_with_values -%}
+                    {%- if option.value != blank -%}
+                      <dt>{{ option.name }}</dt>
+                      <dd>{{ option.value }}</dd>
+                    {%- endif -%}
+                  {%- endfor -%}
+
+                  {%- if item.selling_plan_allocation -%}
+                    <dt>{{ 'cart.subscription' | t }}</dt>
+                    <dd>{{ item.selling_plan_allocation.selling_plan.name }}</dd>
+                  {%- endif -%}
+
+                  {%- for property in item.properties -%}
+                    {%- liquid
+                      assign property_name = property.first
+                      assign property_prefix = property_name | slice: 0
+                    -%}
+                    {%- if property.last != blank and property_prefix != '_' -%}
+                      <dt>{{ property_name }}</dt>
+                      <dd>{{ property.last }}</dd>
+                    {%- endif -%}
+                  {%- endfor -%}
+                {%- endcapture -%}
+
+                {%- if item_meta != blank -%}
+                  <dl class="cart__item-meta">{{ item_meta }}</dl>
+                {%- endif -%}
+
+                <p class="cart__item-price">
+                  {%- if item.original_line_price > item.final_line_price -%}
+                    <span class="cart__vh">{{ 'cart.regular_price' | t }}</span>
+                    <s>{{ item.original_line_price | money }}</s>
+                    <span class="cart__vh">{{ 'cart.sale_price' | t }}</span>
+                    <span>{{ item.final_line_price | money }}</span>
+                  {%- else -%}
+                    <span class="cart__vh">{{ 'cart.price' | t }}</span>
+                    <span>{{ item.final_line_price | money }}</span>
+                  {%- endif -%}
+                </p>
+
+                {%- if item.line_level_discount_allocations.size > 0 -%}
+                  <ul role="list" class="cart__item-discounts">
+                    {%- for allocation in item.line_level_discount_allocations -%}
+                      {%- assign allocated = allocation.amount | money -%}
+                      <li>
+                        {{- allocation.discount_application.title }}
+                        ({{ 'cart.discount_amount' | t: amount: allocated }})
+                      </li>
+                    {%- endfor -%}
+                  </ul>
+                {%- endif -%}
+
+                <div class="cart__qty">
+                  <label class="cart__vh" for="{{ qty_id }}">
+                    {{- 'cart.quantity_for' | t: title: item.product.title -}}
+                  </label>
+
+                  <button
+                    type="button"
+                    class="cart__qty-step"
+                    data-cart-step="-1"
+                    data-focus-id="{{ item.key }}:minus"
+                    {% if item.quantity <= qmin %}disabled{% endif %}
+                  >
+                    <span aria-hidden="true">&minus;</span>
+                    <span class="cart__vh">
+                      {{- 'cart.decrease_for' | t: title: item.product.title -}}
+                    </span>
+                  </button>
+
+                  <input
+                    class="cart__qty-input"
+                    id="{{ qty_id }}"
+                    name="updates[{{ item.key }}]"
+                    type="number"
+                    inputmode="numeric"
+                    value="{{ item.quantity }}"
+                    min="{{ qmin }}"
+                    step="{{ qstep }}"
+                    {% if qmax %}max="{{ qmax }}"{% endif %}
+                    aria-describedby="{{ error_id }}"
+                    data-focus-id="{{ item.key }}:qty"
+                  >
+
+                  <button
+                    type="button"
+                    class="cart__qty-step"
+                    data-cart-step="1"
+                    data-focus-id="{{ item.key }}:plus"
+                    {% if qmax and item.quantity >= qmax %}disabled{% endif %}
+                  >
+                    <span aria-hidden="true">+</span>
+                    <span class="cart__vh">
+                      {{- 'cart.increase_for' | t: title: item.product.title -}}
+                    </span>
+                  </button>
+
+                  {%- comment -%} A GET URL, so removal works with JS unavailable. {%- endcomment -%}
+                  <a
+                    class="cart__remove"
+                    href="{{ item.url_to_remove }}"
+                    data-cart-remove
+                    data-focus-id="{{ item.key }}:remove"
+                  >
+                    <span aria-hidden="true">{{ 'cart.remove' | t }}</span>
+                    <span class="cart__vh">
+                      {{- 'cart.remove_for' | t: title: item.product.title -}}
+                    </span>
+                  </a>
+                </div>
+
+                <p class="cart__item-error" id="{{ error_id }}" data-cart-error hidden></p>
+              </div>
+            </li>
+          {%- endfor -%}
+        </ul>
+
+        {%- comment -%} Hidden once cart is defined; the no-JS path for quantity edits. {%- endcomment -%}
+        <button type="submit" name="update" class="cart__button cart__update">
+          {{- 'cart.update' | t -}}
+        </button>
+      </form>
+
+      <div class="cart__summary">
+        <dl class="cart__totals">
+          {%- if cart.cart_level_discount_applications.size > 0 -%}
+            <dt>{{ 'cart.original_total' | t }}</dt>
+            <dd>{{ cart.original_total_price | money }}</dd>
+
+            {%- for discount in cart.cart_level_discount_applications -%}
+              {%- assign allocated = discount.total_allocated_amount | money -%}
+              <dt>{{ discount.title }}</dt>
+              <dd>{{ 'cart.discount_amount' | t: amount: allocated }}</dd>
+            {%- endfor -%}
+          {%- endif -%}
+
+          <dt>{{ 'cart.subtotal' | t }}</dt>
+          <dd data-cart-subtotal>{{ cart.total_price | money }}</dd>
+        </dl>
+
+        {%- if footnote != blank -%}
+          <p class="cart__footnote">{{ footnote }}</p>
+        {%- endif -%}
+
+        <button
+          type="submit"
+          name="checkout"
+          form="{{ form_id }}"
+          class="cart__button cart__checkout"
+        >
+          {{- 'cart.checkout' | t -}}
+        </button>
+      </div>
+    {%- endif -%}
+  </div>
+
+  {%- comment -%}
+    Outside the swapped node so it survives updates, and inside the dialog so it is
+    not made inert by showModal(). A live region in an inert subtree never announces.
+  {%- endcomment -%}
+  <p class="cart__status" role="status" data-cart-status></p>
+
+  {%- comment -%}
+    Strings for JS. These use {token} placeholders, not Liquid's %{token}, so the
+    `t` filter passes them through untouched and JS does the interpolation.
+  {%- endcomment -%}
+  <script type="application/json" data-cart-strings>
+    {
+      "updated": {{ 'cart.status.updated' | t | json }},
+      "removed": {{ 'cart.status.removed' | t | json }},
+      "loading": {{ 'cart.status.loading' | t | json }},
+      "error": {{ 'cart.status.error' | t | json }},
+      "count_one": {{ 'cart.count_one' | t | json }},
+      "count_other": {{ 'cart.count_other' | t | json }}
+    }
+  </script>
+</cart-root>
+
+{%- if drawer -%}
+    </dialog>
+  </cart-drawer>
+{%- endif -%}
